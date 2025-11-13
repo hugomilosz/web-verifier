@@ -1,5 +1,22 @@
+// Add 1 hour cache
+const apiCache = new Map();
+const CACHE_TTL_MS = 1000 * 60 * 60;
+
 // Call the verification API
 async function callVerificationAPI(endpoint, body) {
+    const cacheKey = `${endpoint}:${JSON.stringify(body)}`;
+    
+    // 1. Check cache
+    if (apiCache.has(cacheKey)) {
+        const cachedItem = apiCache.get(cacheKey);
+        if (Date.now() - cachedItem.timestamp < CACHE_TTL_MS) {
+            console.log("Returning cached result");
+            return cachedItem.data;
+        } else {
+            apiCache.delete(cacheKey); // Cache expired
+        }
+    }
+
     try {
         const response = await fetch(`http://127.0.0.1:8000${endpoint}`, {
             method: 'POST',
@@ -12,7 +29,11 @@ async function callVerificationAPI(endpoint, body) {
         }
 
         const data = await response.json();
-        return { success: true, data: data };
+        const result = { success: true, data: data };
+        
+        // Store in cache
+        apiCache.set(cacheKey, { timestamp: Date.now(), data: result });
+        return result;
 
     } catch (error) {
         console.error("BG API Error:", error);

@@ -98,7 +98,7 @@ def llm_extract_claims(text, page_context=None):
         return []
 
 # Search claims and judge
-def search_and_verify(claim):
+def search_for_evidence(claim):
     print(f"🌐 Manual search for: {claim[:50]}...")
     
     try:
@@ -118,56 +118,88 @@ def search_and_verify(claim):
         evidence_snippets = " | ".join([f"[{r['title']}]: {r['body']}" for r in top_results])
         primary_source = top_results[0]['href']
 
+        return {
+            "claim": claim,
+            "evidence_snippets": evidence_snippets,
+            "primary_source": primary_source
+        }
+
     except Exception as e:
         print(f"Search error: {e}")
         return {"claim": claim, "status": "ERROR", "source_url": "Search engine error", "evidence": str(e)}
 
-    # Judge the evidence
-    judge_prompt = f"""
-    You are a meticulous fact-checker. Fact-check the following claim based ONLY on the provided evidence snippets.
+# API Routes
+@app.post("/verify")
+async def verify_simple(req: VerifyRequest):
+    claims = llm_extract_claims(req.text)
+    return {"claims": [ç(c) for c in claims]}
+
+@app.post("/verify_with_context")
+async def verify_context(req: ContextVerifyRequest):
+    # Extract claims
+    claims = llm_extract_claims(req.claim_text, page_context=req.page_context)
+    if not claims:
+        return {"claims": []}
+
+    # Search for evidence for all claims
+    claims_with_evidence = [search_for_evidence(c) for c in claims]
+
+    # Judge prompt
+    judge_prompt = "You are a meticulous fact-checker. Fact-check the following claims based ONLY on the provided evidence snippets for each.\n\n"
     
-    Claim: "{claim}"
-    
-    Evidence: "{evidence_snippets}"
-    
+    for i, item in enumerate(claims_with_evidence):
+        if "evidence_snippets" in item:
+            judge_prompt += f"--- CLAIM #{i+1} ---\n"
+            judge_prompt += f"Claim: \"{item['claim']}\"\n"
+            judge_prompt += f"Evidence: \"{item['evidence_snippets']}\"\n\n"
+
+    judge_prompt += """
     Respond with a single JSON object with this EXACT schema:
-    {{
-      "status": "SUPPORTED" | "CONTRADICTED" | "UNSURE",
-      "evidence": "A brief, neutral summary of the findings. If UNSURE, explain why (e.g., 'Evidence is irrelevant or insufficient')."
-    }}
+    {
+      "results": [
+        {
+          "claim_index": <index_number_from_prompt>,
+          "status": "SUPPORTED" | "CONTRADICTED" | "UNSURE",
+          "evidence": "A brief, neutral summary of the findings."
+        }
+      ]
+    }
     """
-    
+
+    # Judge all claims simultaneously
     try:
         response = model.generate_content(
             judge_prompt,
             generation_config={"response_mime_type": "application/json"},
             safety_settings=safety_settings
         )
-        result_json = json.loads(response.text)
-        status = result_json.get("status", "UNSURE")
-        evidence = result_json.get("evidence", "Model judgment failed.")
-
-        return {
-            "claim": claim,
-            "status": status,
-            "source_url": primary_source,
-            "evidence": evidence
-        }
-
+        judgements = json.loads(response.text).get("results", [])
     except Exception as e:
-        print(f"LLM Judge error: {e}")
-        return {"claim": claim, "status": "UNSURE", "source_url": primary_source, "evidence": "LLM judging process failed."}
+        print(f"LLM Batch Judge error: {e}")
+        judgements = []
 
-# API Routes
-@app.post("/verify")
-async def verify_simple(req: VerifyRequest):
-    claims = llm_extract_claims(req.text)
-    return {"claims": [search_and_verify(c) for c in claims]}
+    final_results = []
+    judgement_map = {j['claim_index']: j for j in judgements}
 
-@app.post("/verify_with_context")
-async def verify_context(req: ContextVerifyRequest):
-    claims = llm_extract_claims(req.claim_text, page_context=req.page_context)
-    return {"claims": [search_and_verify(c) for c in claims]}
+    for i, item in enumerate(claims_with_evidence):
+        judgement = judgement_map.get(i + 1)
+        if judgement:
+            final_results.append({
+                "claim": item['claim'],
+                "status": judgement.get("status", "UNSURE"),
+                "source_url": item.get("primary_source", ""),
+                "evidence": judgement.get("evidence", "LLM judging process failed.")
+            })
+        else:
+            # Handle claims that failed search or failed judging
+            final_results.append({
+                "claim": item['claim'],
+                "status": item.get("status", "UNSURE"),
+                "source_url": item.get("source_url", ""),
+                "evidence": item.get("evidence", "Claim was not processed by judge.")
+            })
+
+    return {"claims": final_results}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8000)

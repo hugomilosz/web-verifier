@@ -210,7 +210,21 @@ function injectVerifier() {
     }
 }
 
-setInterval(injectVerifier, 1500);
+// MutationObserver to watch for dynamic content
+const mutationCallback = (mutationsList, observer) => {
+    for (const mutation of mutationsList) {
+        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+            // Check if "AI Overview" is now present
+            injectVerifier();
+        }
+    }
+};
+
+const observer = new MutationObserver(mutationCallback);
+observer.observe(document.body, { childList: true, subtree: true });
+
+// Run it once on initial load, just in case
+injectVerifier();
 
 
 // FLOW 2: Selected Text Verification
@@ -282,6 +296,7 @@ document.addEventListener('mouseup', (evt) => {
         (response) => {
             if (chrome.runtime.lastError) {
                 showGlobalError(chrome.runtime.lastError.message);
+                return;
             } else if (response && response.success) {
                 showGlobalResults(response.data);
             } else {
