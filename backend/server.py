@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 from ddgs import DDGS
+from typing import List, Optional
 
 load_dotenv()
 
@@ -37,10 +38,12 @@ app.add_middleware(
 
 class VerifyRequest(BaseModel):
     text: str
+    user_bad_domains: Optional[List[str]] = None
 
 class ContextVerifyRequest(BaseModel):
     claim_text: str
     page_context: str
+    user_bad_domains: Optional[List[str]] = None
 
 # Domain Filter
 BAD_DOMAINS = {
@@ -49,13 +52,14 @@ BAD_DOMAINS = {
     "quora.com", "theonion.com", "linkedin.com"
 }
 
-def is_trusted_url(url):
-    """Returns False if the domain is in the defined blacklist."""
+# Returns False if the domain is in the pre-defined or user-defined blacklist
+def is_trusted_url(url, user_bad_domains=None):
+    all_bad_domains = BAD_DOMAINS.union(set(user_bad_domains or []))
     try:
         domain = urlparse(url).netloc.lower()
         if domain.startswith("www."):
             domain = domain[4:]
-        for bad in BAD_DOMAINS:
+        for bad in all_bad_domains:
             if domain == bad or domain.endswith("." + bad):
                 return False
         return True
@@ -98,15 +102,15 @@ def llm_extract_claims(text, page_context=None):
         return []
 
 # Search claims and judge
-def search_for_evidence(claim):
-    print(f"🌐 Manual search for: {claim[:50]}...")
+def search_for_evidence(claim, user_bad_domains=None):
+    print(f"Manual search for: {claim[:50]}...")
     
     try:
         # Manually search and filter for trusted sources
         raw_results = list(DDGS().text(claim, max_results=10))
         clean_results = []
         for r in raw_results:
-            if is_trusted_url(r['href']):
+            if is_trusted_url(r['href'], user_bad_domains):
                 clean_results.append(r)
         
         top_results = clean_results[:3]
@@ -132,7 +136,8 @@ def search_for_evidence(claim):
 @app.post("/verify")
 async def verify_simple(req: VerifyRequest):
     claims = llm_extract_claims(req.text)
-    return {"claims": [ç(c) for c in claims]}
+    claims_with_evidence = [search_for_evidence(c, req.user_bad_domains) for c in claims]
+    return {"claims": claims_with_evidence}
 
 @app.post("/verify_with_context")
 async def verify_context(req: ContextVerifyRequest):
@@ -142,8 +147,8 @@ async def verify_context(req: ContextVerifyRequest):
         return {"claims": []}
 
     # Search for evidence for all claims
-    claims_with_evidence = [search_for_evidence(c) for c in claims]
-
+    claims_with_evidence = [search_for_evidence(c, req.user_bad_domains) for c in claims]
+    
     # Judge prompt
     judge_prompt = "You are a meticulous fact-checker. Fact-check the following claims based ONLY on the provided evidence snippets for each.\n\n"
     

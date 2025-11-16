@@ -6,14 +6,14 @@ const CACHE_TTL_MS = 1000 * 60 * 60;
 async function callVerificationAPI(endpoint, body) {
     const cacheKey = `${endpoint}:${JSON.stringify(body)}`;
     
-    // 1. Check cache
+    // Check cache
     if (apiCache.has(cacheKey)) {
         const cachedItem = apiCache.get(cacheKey);
         if (Date.now() - cachedItem.timestamp < CACHE_TTL_MS) {
             console.log("Returning cached result");
             return cachedItem.data;
         } else {
-            apiCache.delete(cacheKey); // Cache expired
+            apiCache.delete(cacheKey);
         }
     }
 
@@ -53,8 +53,6 @@ chrome.runtime.onInstalled.addListener(() => {
 // Listener for context menu click
 chrome.contextMenus.onClicked.addListener((info, tab) => {
     if (info.menuItemId === "verify-selection") {
-        
-        // Show the loader
         chrome.tabs.sendMessage(tab.id, { 
             action: "showGlobalLoader", 
             message: "Verifying selection..." 
@@ -70,17 +68,22 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
                 return;
             }
 
-            const apiResponse = await callVerificationAPI("/verify_with_context", {
-                claim_text: info.selectionText,
-                page_context: response.context
-            });
+            (async () => {
+                const storage = await chrome.storage.sync.get('badDomains');
+                const userBadDomains = storage.badDomains || [];
 
-            // Send results back to the content.js
-            if (apiResponse.success) {
-                chrome.tabs.sendMessage(tab.id, { action: "showResults", data: apiResponse.data });
-            } else {
-                chrome.tabs.sendMessage(tab.id, { action: "showError", error: apiResponse.error });
-            }
+                const apiResponse = await callVerificationAPI("/verify_with_context", {
+                    claim_text: info.selectionText,
+                    page_context: contextResponse.context,
+                    user_bad_domains: userBadDomains
+                });
+
+                if (apiResponse.success) {
+                    chrome.tabs.sendMessage(tab.id, { action: "showResults", data: apiResponse.data });
+                } else {
+                    chrome.tabs.sendMessage(tab.id, { action: "showError", error: apiResponse.error });
+                }
+            })();
         });
     }
 });
@@ -89,20 +92,32 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     // Listener for Verify AI Overview button
     if (request.action === "verifyText") {
-        callVerificationAPI("/verify", { text: request.text })
-            .then(response => sendResponse(response));
-        
-        return true; 
+        (async () => {
+            const storage = await chrome.storage.sync.get('badDomains');
+            const userBadDomains = storage.badDomains || [];
+            
+            const response = await callVerificationAPI("/verify", { 
+                text: request.text,
+                user_bad_domains: userBadDomains
+            });
+            sendResponse(response);
+        })();
+        return true;
     }
 
     // Listener for tooltip
     if (request.action === "verifyTextWithContext") {
-        callVerificationAPI("/verify_with_context", {
-            claim_text: request.claim,
-            page_context: request.context
-        })
-        .then(response => sendResponse(response));
-        
+        (async () => {
+            const storage = await chrome.storage.sync.get('badDomains');
+            const userBadDomains = storage.badDomains || [];
+            
+            const response = await callVerificationAPI("/verify_with_context", {
+                claim_text: request.claim,
+                page_context: request.context,
+                user_bad_domains: userBadDomains
+            });
+            sendResponse(response);
+        })();
         return true;
     }
 });
