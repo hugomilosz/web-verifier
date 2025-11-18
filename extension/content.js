@@ -1,6 +1,14 @@
 console.log("AI Verifier: Content script active.");
 
 let globalResultBox = null;
+let loadingInterval = null;
+
+const LOAD_PHRASES = [
+    "Searching the archives...",
+    "Putting on the reading glasses...",
+    "Sipping coffee...",
+    "Asking the librarian..."
+];
 
 // Creates the global result box if it doesn't exist
 function createGlobalResultBox() {
@@ -90,15 +98,29 @@ function renderResults(data, container) {
 // Show spinner
 function showGlobalLoading(message) {
     createGlobalResultBox();
+    if (loadingInterval) clearInterval(loadingInterval);
+
+    // Set initial content
     globalResultBox.innerHTML = `
         <div class="verifier-loading">
             <span class="spinner"></span>
-            <p>${message || "Verifying..."}</p>
+            <p id="verifier-loading-text">${message || "Verifying..."}</p>
         </div>`;
+
+    const textEl = document.getElementById("verifier-loading-text");
+    
+    // Cycle through loading phrases
+    if (textEl) {
+        loadingInterval = setInterval(() => {
+            const randomPhrase = LOAD_PHRASES[Math.floor(Math.random() * LOAD_PHRASES.length)];
+            textEl.innerText = randomPhrase;
+        }, 2000);
+    }
 }
 
 function showGlobalError(error) {
     createGlobalResultBox();
+    if (loadingInterval) clearInterval(loadingInterval);
     globalResultBox.innerHTML = `<div class="verifier-error">⚠️ ${error || "Unknown error."}</div>`;
     addCloseButton(globalResultBox);
 }
@@ -106,6 +128,11 @@ function showGlobalError(error) {
 // Display results in the box
 function showGlobalResults(data) {
     createGlobalResultBox();
+    if (loadingInterval) clearInterval(loadingInterval);
+    globalResultBox.classList.add("verifier-stamp-animation");
+    setTimeout(() => {
+        globalResultBox.classList.remove("verifier-stamp-animation");
+    }, 500);
     renderResults(data, globalResultBox);
     addCloseButton(globalResultBox);
 
@@ -166,8 +193,7 @@ function injectVerifier() {
         const btn = document.createElement("button");
         btn.className = "verifier-btn";
         btn.innerHTML = '<span>🕵️</span> Verify with Trusted Sources';
-        
-        // 1. Create the INLINE result box
+
         const resultBox = document.createElement("div");
         resultBox.className = "verifier-result-box";
         resultBox.classList.add("verifier-hidden");
