@@ -129,6 +129,8 @@ function showGlobalError(error) {
 function showGlobalResults(data) {
     createGlobalResultBox();
     if (loadingInterval) clearInterval(loadingInterval);
+    globalResultBox.classList.remove("verifier-stamp-animation");
+    void globalResultBox.offsetWidth;
     globalResultBox.classList.add("verifier-stamp-animation");
     setTimeout(() => {
         globalResultBox.classList.remove("verifier-stamp-animation");
