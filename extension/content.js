@@ -31,6 +31,12 @@ function addCloseButton(box) {
     box.appendChild(close);
 }
 
+function getConfidenceColor(score) {
+    if (score >= 80) return '#3b82f6';
+    if (score >= 50) return '#a855f7';
+    return '#9ca3af';
+}
+
 // Renders the verification results into a container
 function renderResults(data, container) {
     if (!data.claims || data.claims.length === 0) {
@@ -51,43 +57,51 @@ function renderResults(data, container) {
     data.claims.forEach(item => {
         let statusClass = "status-unsure";
         let icon = "❓";
-        let statusText = "UNSURE";
-
+        
         if (item.status === "SUPPORTED") {
             statusClass = "status-supported";
             icon = "✅";
-            statusText = "SUPPORTED";
         } else if (item.status === "CONTRADICTED") {
             statusClass = "status-disputed";
             icon = "❌";
-            statusText = "CONTRADICTED";
         }
 
+        const confidence = item.confidence_score || 0;
+        const barColor = getConfidenceColor(confidence);
+        
+        let confLabel = "Low";
+        if (confidence > 80) confLabel = "High";
+        else if (confidence > 50) confLabel = "Medium";
+
         let sources = [];
-        if (item.sources && Array.isArray(item.sources)) {
-            sources = item.sources.map(s => `<a href="${s.url}" target="_blank">${new URL(s.url).hostname}</a>`);
-        } else if (item.source_url) {
+        if (item.source_url) {
             try {
-                sources = [`<a href="${item.source_url}" target="_blank">${new URL(item.source_url).hostname}</a>`];
-            } catch {
-                sources = [item.source_url];
-            }
+                let hostname = new URL(item.source_url).hostname.replace('www.', '');
+                sources = [`<a href="${item.source_url}" target="_blank">${hostname}</a>`];
+            } catch { sources = ["Source"]; }
         }
 
         html += `
             <div class="claim-item ${statusClass}">
-                <div class="claim-status">
-                    ${icon} ${statusText}
+                <div class="claim-header-row">
+                    <span class="claim-status-pill">${icon} ${item.status}</span>
                 </div>
-                <div class="claim-text">${item.claim}</div>
+
+                <div class="claim-text">"${item.claim}"</div>
+
+                <div class="confidence-section">
+                    <div class="conf-label">
+                        <span>AI Confidence: <strong>${confLabel}</strong></span>
+                        <span>${confidence}%</span>
+                    </div>
+                    <div class="conf-bar-track">
+                        <div class="conf-bar-fill" style="width: ${confidence}%; background-color: ${barColor};"></div>
+                    </div>
+                </div>
                 
-                ${item.evidence ? `
-                <div class="claim-evidence">${item.evidence}</div>` : ''}
+                ${item.evidence ? `<div class="claim-evidence">${item.evidence}</div>` : ''}
                 
-                ${sources.length > 0 ? `
-                <div class="claim-sources">
-                    Sources: ${sources.join(' • ')}
-                </div>` : ''}
+                ${sources.length > 0 ? `<div class="claim-sources">Source: ${sources.join('')}</div>` : ''}
             </div>`;
     });
 

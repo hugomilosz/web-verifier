@@ -150,7 +150,7 @@ async def verify_context(req: ContextVerifyRequest):
     claims_with_evidence = [search_for_evidence(c, req.user_bad_domains) for c in claims]
     
     # Judge prompt
-    judge_prompt = "You are a meticulous fact-checker. Fact-check the following claims based ONLY on the provided evidence snippets for each.\n\n"
+    judge_prompt = "You are a meticulous fact-checker. Fact-check the following claims based ONLY on the provided evidence snippets.\n\n"
     
     for i, item in enumerate(claims_with_evidence):
         if "evidence_snippets" in item:
@@ -159,16 +159,23 @@ async def verify_context(req: ContextVerifyRequest):
             judge_prompt += f"Evidence: \"{item['evidence_snippets']}\"\n\n"
 
     judge_prompt += """
-    Respond with a single JSON object with this EXACT schema:
-    {
-      "results": [
+        Respond with a single JSON object with this EXACT schema:
         {
-          "claim_index": <index_number_from_prompt>,
-          "status": "SUPPORTED" | "CONTRADICTED" | "UNSURE",
-          "evidence": "A brief, neutral summary of the findings."
+        "results": [
+            {
+            "claim_index": <index_number_from_prompt>,
+            "status": "SUPPORTED" | "CONTRADICTED" | "UNSURE",
+            "confidence_score": <integer_0_to_100>,
+            "evidence": "A brief, neutral summary of the findings."
+            }
+        ]
         }
-      ]
-    }
+        GUIDE FOR CONFIDENCE_SCORE:
+        - This represents how sure YOU are of your own verdict based strictly on the provided snippets.
+        - 90-100: Multiple high-quality sources confirm the status explicitly.
+        - 70-89: One strong source or multiple decent sources confirm it.
+        - 40-69: The evidence is slightly vague, indirect, or from a single mediocre source.
+        - 0-39: The evidence is very weak, ambiguous, or you are guessing.
     """
 
     # Judge all claims simultaneously
@@ -192,6 +199,7 @@ async def verify_context(req: ContextVerifyRequest):
             final_results.append({
                 "claim": item['claim'],
                 "status": judgement.get("status", "UNSURE"),
+                "confidence_score": judgement.get("confidence_score", 0),
                 "source_url": item.get("primary_source", ""),
                 "evidence": judgement.get("evidence", "LLM judging process failed.")
             })
@@ -200,6 +208,7 @@ async def verify_context(req: ContextVerifyRequest):
             final_results.append({
                 "claim": item['claim'],
                 "status": item.get("status", "UNSURE"),
+                "confidence_score": 0,
                 "source_url": item.get("source_url", ""),
                 "evidence": item.get("evidence", "Claim was not processed by judge.")
             })
