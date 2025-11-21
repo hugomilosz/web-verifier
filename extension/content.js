@@ -7,7 +7,8 @@ const LOAD_PHRASES = [
     "Searching the archives...",
     "Putting on the reading glasses...",
     "Sipping coffee...",
-    "Asking the librarian..."
+    "Asking the librarian...",
+    "Scanning the microfiche...",
 ];
 
 // Creates the global result box if it doesn't exist
@@ -99,7 +100,15 @@ function renderResults(data, container) {
                     </div>
                 </div>
                 
-                ${item.evidence ? `<div class="claim-evidence">${item.evidence}</div>` : ''}
+                ${item.evidence ? `
+                <div class="claim-actions" style="margin-top: 8px;">
+                    <button class="toggle-evidence-btn">
+                        See Evidence & Reasoning ▼
+                    </button>
+                    <div class="claim-evidence-hidden">
+                        ${item.evidence}
+                    </div>
+                </div>` : ''}
                 
                 ${sources.length > 0 ? `<div class="claim-sources">Source: ${sources.join('')}</div>` : ''}
             </div>`;
@@ -107,6 +116,25 @@ function renderResults(data, container) {
 
     html += `</div>`;
     container.innerHTML = html;
+
+    // Show evidence toggles
+    const buttons = container.querySelectorAll('.toggle-evidence-btn');
+    buttons.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const button = e.currentTarget;
+            const evidenceBox = button.nextElementSibling;
+            
+            if (evidenceBox) {
+                evidenceBox.classList.toggle('show-evidence');
+                
+                if (evidenceBox.classList.contains('show-evidence')) {
+                    button.innerText = "Hide Evidence & Reasoning ▲";
+                } else {
+                    button.innerText = "See Evidence & Reasoning ▼";
+                }
+            }
+        });
+    });
 }
 
 // Show spinner
