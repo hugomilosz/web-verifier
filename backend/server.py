@@ -166,6 +166,7 @@ async def verify_context(req: ContextVerifyRequest):
             "claim_index": <index_number_from_prompt>,
             "status": "SUPPORTED" | "CONTRADICTED" | "UNSURE",
             "confidence_score": <integer_0_to_100>,
+            "source_type": "GOVERNMENT" | "ACADEMIC" | "NEWS" | "OPINION" | "UNKNOWN",
             "evidence": "A brief, neutral summary of the findings."
             }
         ]
@@ -176,6 +177,13 @@ async def verify_context(req: ContextVerifyRequest):
         - 70-89: One strong source or multiple decent sources confirm it.
         - 40-69: The evidence is slightly vague, indirect, or from a single mediocre source.
         - 0-39: The evidence is very weak, ambiguous, or you are guessing.
+
+        GUIDE FOR SOURCE_TYPE:
+        - GOVERNMENT: .gov domains, official agencies (FBI, CDC, WH).
+        - ACADEMIC: .edu domains, journals (Nature, Lancet, Science), universities.
+        - NEWS: Mainstream journalism (NYT, BBC, Reuters, AP).
+        - OPINION: Blogs, social media, forums, or highly biased think-tanks.
+        - UNKNOWN: If the source is unclear or general.
     """
 
     # Judge all claims simultaneously
@@ -200,6 +208,7 @@ async def verify_context(req: ContextVerifyRequest):
                 "claim": item['claim'],
                 "status": judgement.get("status", "UNSURE"),
                 "confidence_score": judgement.get("confidence_score", 0),
+                "source_type": judgement.get("source_type", "UNKNOWN"),
                 "source_url": item.get("primary_source", ""),
                 "evidence": judgement.get("evidence", "LLM judging process failed.")
             })
@@ -209,6 +218,7 @@ async def verify_context(req: ContextVerifyRequest):
                 "claim": item['claim'],
                 "status": item.get("status", "UNSURE"),
                 "confidence_score": 0,
+                "source_type": "UNKNOWN",
                 "source_url": item.get("source_url", ""),
                 "evidence": item.get("evidence", "Claim was not processed by judge.")
             })

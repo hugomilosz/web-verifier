@@ -38,6 +38,34 @@ function getConfidenceColor(score) {
     return '#9ca3af';
 }
 
+function getSourceBadgeHTML(type) {
+    let label = "Web Source";
+    let className = "badge-unknown";
+
+    switch (type) {
+        case 'GOVERNMENT':
+            label = "Gov / Official";
+            className = "badge-gov";
+            break;
+        case 'ACADEMIC':
+            label = "Academic / Science";
+            className = "badge-edu";
+            break;
+        case 'NEWS':
+            label = "News Media";
+            className = "badge-news";
+            break;
+        case 'OPINION':
+            label = "Opinion / Blog";
+            className = "badge-opinion";
+            break;
+        default:
+            // Use defaults
+            break;
+    }
+    return `<span class="source-badge ${className}">${label}</span>`;
+}
+
 // Renders the verification results into a container
 function renderResults(data, container) {
     if (!data.claims || data.claims.length === 0) {
@@ -74,12 +102,15 @@ function renderResults(data, container) {
         if (confidence > 80) confLabel = "High";
         else if (confidence > 50) confLabel = "Medium";
 
-        let sources = [];
+        let sourcesHTML = "";
         if (item.source_url) {
             try {
                 let hostname = new URL(item.source_url).hostname.replace('www.', '');
-                sources = [`<a href="${item.source_url}" target="_blank">${hostname}</a>`];
-            } catch { sources = ["Source"]; }
+                const badge = getSourceBadgeHTML(item.source_type); // <--- Generate Badge
+                sourcesHTML = `${badge}<a href="${item.source_url}" target="_blank">${hostname}</a>`;
+            } catch { 
+                sourcesHTML = `<span class="source-badge badge-unknown">Unknown</span> Source`; 
+            }
         }
 
         html += `
@@ -110,7 +141,7 @@ function renderResults(data, container) {
                     </div>
                 </div>` : ''}
                 
-                ${sources.length > 0 ? `<div class="claim-sources">Source: ${sources.join('')}</div>` : ''}
+                ${sourcesHTML ? `<div class="claim-sources">${sourcesHTML}</div>` : ''}
             </div>`;
     });
 
