@@ -1,19 +1,19 @@
 {
-  "manifest_version": 3,
-  "name": "Universal Fact Checker",
-  "version": "2.0",
-  "description": "Verify AI overviews or any text with claims.",
-  "permissions": ["activeTab", "scripting", "contextMenus", "storage"],
-  "host_permissions": ["<all_urls>", "http://127.0.0.1:8000/*"],
-  "background": {
-    "service_worker": "background.js"
-  },
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"],
-      "css": ["styles.css"]
-    }
-  ],
-  "options_page": "options.html"
+    "manifest_version": 3,
+    "name": "Universal Fact Checker",
+    "version": "2.0",
+    "description": "Verify AI overviews or any text with claims.",
+    "permissions": ["activeTab", "scripting", "contextMenus", "storage"],
+    "host_permissions": ["<all_urls>", "http://127.0.0.1:8000/*"],
+    "background": {
+        "service_worker": "background.js"
+    },
+    "content_scripts": [
+        {
+            "matches": ["<all_urls>"],
+            "js": ["content.js"],
+            "css": ["styles.css"]
+        }
+    ],
+    "options_page": "options.html"
 }

@@ -18,7 +18,7 @@ if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY not found in .env file")
 
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('models/gemini-2.5-flash')
+model = genai.GenerativeModel("models/gemini-2.5-flash")
 
 safety_settings = {
     HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
@@ -36,21 +36,34 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 class VerifyRequest(BaseModel):
     text: str
     user_bad_domains: Optional[List[str]] = None
+
 
 class ContextVerifyRequest(BaseModel):
     claim_text: str
     page_context: str
     user_bad_domains: Optional[List[str]] = None
 
+
 # Domain Filter
 BAD_DOMAINS = {
-    "wikipedia.org", "reddit.com", "pinterest.com", "twitter.com", "x.com",
-    "facebook.com", "instagram.com", "tiktok.com", "youtube.com",
-    "quora.com", "theonion.com", "linkedin.com"
+    "wikipedia.org",
+    "reddit.com",
+    "pinterest.com",
+    "twitter.com",
+    "x.com",
+    "facebook.com",
+    "instagram.com",
+    "tiktok.com",
+    "youtube.com",
+    "quora.com",
+    "theonion.com",
+    "linkedin.com",
 }
+
 
 # Returns False if the domain is in the pre-defined or user-defined blacklist
 def is_trusted_url(url, user_bad_domains=None):
@@ -66,10 +79,12 @@ def is_trusted_url(url, user_bad_domains=None):
     except:
         return False
 
+
 # Extract claims from text
 def llm_extract_claims(text, page_context=None):
     print(f"Sending text to Gemini (Length: {len(text)})...")
-    if len(text) < 50: return []
+    if len(text) < 50:
+        return []
 
     if page_context:
         prompt = f"""
@@ -94,51 +109,68 @@ def llm_extract_claims(text, page_context=None):
         response = model.generate_content(
             prompt,
             generation_config={"response_mime_type": "application/json"},
-            safety_settings=safety_settings
+            safety_settings=safety_settings,
         )
         return json.loads(response.text)[:5]
     except Exception as e:
         print(f"Claim extraction error: {e}")
         return []
 
+
 # Search claims and judge
 def search_for_evidence(claim, user_bad_domains=None):
     print(f"Manual search for: {claim[:50]}...")
-    
+
     try:
         # Manually search and filter for trusted sources
         search_query = f"{claim} fact check"
         raw_results = list(DDGS().text(search_query, max_results=10))
         clean_results = []
         for r in raw_results:
-            if is_trusted_url(r['href'], user_bad_domains):
+            if is_trusted_url(r["href"], user_bad_domains):
                 clean_results.append(r)
-        
+
         top_results = clean_results[:3]
 
         if not top_results:
-             return {"claim": claim, "status": "UNSURE", "source_url": "No reliable sources found", "evidence": "No reliable sources found after filtering."}
+            return {
+                "claim": claim,
+                "status": "UNSURE",
+                "source_url": "No reliable sources found",
+                "evidence": "No reliable sources found after filtering.",
+            }
 
         # Compile evidence
-        evidence_snippets = " | ".join([f"[{r['title']}]: {r['body']}" for r in top_results])
-        primary_source = top_results[0]['href']
+        evidence_snippets = " | ".join(
+            [f"[{r['title']}]: {r['body']}" for r in top_results]
+        )
+        primary_source = top_results[0]["href"]
 
         return {
             "claim": claim,
             "evidence_snippets": evidence_snippets,
-            "primary_source": primary_source
+            "primary_source": primary_source,
         }
 
     except Exception as e:
         print(f"Search error: {e}")
-        return {"claim": claim, "status": "ERROR", "source_url": "Search engine error", "evidence": str(e)}
+        return {
+            "claim": claim,
+            "status": "ERROR",
+            "source_url": "Search engine error",
+            "evidence": str(e),
+        }
+
 
 # API Routes
 @app.post("/verify")
 async def verify_simple(req: VerifyRequest):
     claims = llm_extract_claims(req.text)
-    claims_with_evidence = [search_for_evidence(c, req.user_bad_domains) for c in claims]
+    claims_with_evidence = [
+        search_for_evidence(c, req.user_bad_domains) for c in claims
+    ]
     return {"claims": claims_with_evidence}
+
 
 @app.post("/verify_with_context")
 async def verify_context(req: ContextVerifyRequest):
@@ -148,11 +180,13 @@ async def verify_context(req: ContextVerifyRequest):
         return {"claims": []}
 
     # Search for evidence for all claims
-    claims_with_evidence = [search_for_evidence(c, req.user_bad_domains) for c in claims]
-    
+    claims_with_evidence = [
+        search_for_evidence(c, req.user_bad_domains) for c in claims
+    ]
+
     # Judge prompt
     judge_prompt = "You are a meticulous fact-checker. Fact-check the following claims based ONLY on the provided evidence snippets.\n\n"
-    
+
     for i, item in enumerate(claims_with_evidence):
         if "evidence_snippets" in item:
             judge_prompt += f"--- CLAIM #{i+1} ---\n"
@@ -208,7 +242,7 @@ async def verify_context(req: ContextVerifyRequest):
         response = model.generate_content(
             judge_prompt,
             generation_config={"response_mime_type": "application/json"},
-            safety_settings=safety_settings
+            safety_settings=safety_settings,
         )
         judgements = json.loads(response.text).get("results", [])
     except Exception as e:
@@ -216,31 +250,40 @@ async def verify_context(req: ContextVerifyRequest):
         judgements = []
 
     final_results = []
-    judgement_map = {j['claim_index']: j for j in judgements}
+    judgement_map = {j["claim_index"]: j for j in judgements}
 
     for i, item in enumerate(claims_with_evidence):
         judgement = judgement_map.get(i + 1)
         if judgement:
-            final_results.append({
-                "claim": item['claim'],
-                "status": judgement.get("status", "UNSURE"),
-                "confidence_score": judgement.get("confidence_score", 0),
-                "source_type": judgement.get("source_type", "UNKNOWN"),
-                "source_url": item.get("primary_source", ""),
-                "evidence": judgement.get("evidence", "LLM judging process failed.")
-            })
+            final_results.append(
+                {
+                    "claim": item["claim"],
+                    "status": judgement.get("status", "UNSURE"),
+                    "confidence_score": judgement.get("confidence_score", 0),
+                    "source_type": judgement.get("source_type", "UNKNOWN"),
+                    "source_url": item.get("primary_source", ""),
+                    "evidence": judgement.get(
+                        "evidence", "LLM judging process failed."
+                    ),
+                }
+            )
         else:
             # Handle claims that failed search or failed judging
-            final_results.append({
-                "claim": item['claim'],
-                "status": item.get("status", "UNSURE"),
-                "confidence_score": 0,
-                "source_type": "UNKNOWN",
-                "source_url": item.get("source_url", ""),
-                "evidence": item.get("evidence", "Claim was not processed by judge.")
-            })
+            final_results.append(
+                {
+                    "claim": item["claim"],
+                    "status": item.get("status", "UNSURE"),
+                    "confidence_score": 0,
+                    "source_type": "UNKNOWN",
+                    "source_url": item.get("source_url", ""),
+                    "evidence": item.get(
+                        "evidence", "Claim was not processed by judge."
+                    ),
+                }
+            )
 
     return {"claims": final_results}
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8000)
