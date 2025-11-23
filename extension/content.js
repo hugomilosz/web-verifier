@@ -341,6 +341,10 @@ function removeTooltip() {
 }
 
 document.addEventListener('mouseup', (evt) => {
+    if (globalResultBox && globalResultBox.style.display !== 'none' && globalResultBox.isConnected) {
+        return;
+    }
+
   const selectedText = window.getSelection().toString().trim();
 
   if (!selectedText || selectedText.length < 5) {
