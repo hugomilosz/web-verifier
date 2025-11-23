@@ -107,7 +107,8 @@ def search_for_evidence(claim, user_bad_domains=None):
     
     try:
         # Manually search and filter for trusted sources
-        raw_results = list(DDGS().text(claim, max_results=10))
+        search_query = f"{claim} fact check"
+        raw_results = list(DDGS().text(search_query, max_results=10))
         clean_results = []
         for r in raw_results:
             if is_trusted_url(r['href'], user_bad_domains):
@@ -172,18 +173,34 @@ async def verify_context(req: ContextVerifyRequest):
         ]
         }
         GUIDE FOR CONFIDENCE_SCORE:
-        - This represents how sure YOU are of your own verdict based strictly on the provided snippets.
-        - 90-100: Multiple high-quality sources confirm the status explicitly.
-        - 70-89: One strong source or multiple decent sources confirm it.
-        - 40-69: The evidence is slightly vague, indirect, or from a single mediocre source.
-        - 0-39: The evidence is very weak, ambiguous, or you are guessing.
+            - This represents how sure YOU are of your own verdict based strictly on the provided snippets.
+            - 90-100: Multiple high-quality sources confirm the status explicitly.
+            - 70-89: One strong source or multiple decent sources confirm it.
+            - 40-69: The evidence is slightly vague, indirect, or from a single mediocre source.
+            - 0-39: The evidence is very weak, ambiguous, or you are guessing.
 
         GUIDE FOR SOURCE_TYPE:
-        - GOVERNMENT: .gov domains, official agencies (FBI, CDC, WH).
-        - ACADEMIC: .edu domains, journals (Nature, Lancet, Science), universities.
-        - NEWS: Mainstream journalism (NYT, BBC, Reuters, AP).
-        - OPINION: Blogs, social media, forums, or highly biased think-tanks.
-        - UNKNOWN: If the source is unclear or general.
+            - GOVERNMENT: .gov domains, official agencies (FBI, CDC, WH).
+            - ACADEMIC: .edu domains, journals (Nature, Lancet, Science), universities.
+            - NEWS: Mainstream journalism (NYT, BBC, Reuters, AP).
+            - OPINION: Blogs, social media, forums, or highly biased think-tanks.
+            - UNKNOWN: If the source is unclear or general.
+
+        # CRITICAL JUDGING RULES:
+    
+            1. DISTINGUISH REPORTING ON RUMORS vs. REPORTING ON FACTS:
+            - If the evidence says "Rumors circulate that [X]" or "Allegations made that [X]", but does not confirm [X] as fact, the claim "[X] happened" is UNSURE or CONTRADICTED (depending on if the rumor was debunked).
+            - Mere mentions of the claim in the search results do not constitute support.
+            
+            2. WATCH FOR DEBUNKS:
+            - If the search results contain phrases like "False claim", "Debunked", "No evidence for", or "Fact check: False", the status must be CONTRADICTED.
+            
+            3. CHECK FOR CONSENSUS:
+            - Extraordinary claims (e.g., celebrity deaths, coups, scientific breakthroughs) require verification from multiple reliable sources (News/Gov). 
+            - If the only evidence comes from tabloids, blogs, or social media, mark as UNSURE or MISSING_CONTEXT.
+            
+            4. EXACTNESS MATTERS:
+            - Be careful with metaphorical vs. literal interpretations. If the claim is physical (e.g., "The CEO died") but the evidence is metaphorical (e.g., "The CEO died of embarrassment"), the status is CONTRADICTED.
     """
 
     # Judge all claims simultaneously
