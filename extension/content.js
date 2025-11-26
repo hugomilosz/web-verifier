@@ -79,9 +79,14 @@ function renderResults(data, container) {
     }
 
     let html = `
-        <div class="verifier-header">
-            <h3>AI Fact Check Results</h3>
-            <p>Found <strong>${data.claims.length}</strong> factual claims</p>
+        <div class="verifier-header" style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+            <div>
+                <h3 style="margin: 0; font-size: 16px;">AI Fact Check Results</h3>
+                <p style="margin: 4px 0 0; color: #6b7280; font-size: 13px;">Found <strong>${data.claims.length}</strong> factual claims</p>
+            </div>
+            <button id="verifier-copy-btn" class="verifier-copy-btn" title="Copy Analysis to Clipboard">
+                Copy Results
+            </button>
         </div>
         <div class="verifier-claims">`;
 
@@ -111,7 +116,7 @@ function renderResults(data, container) {
                     "www.",
                     ""
                 );
-                const badge = getSourceBadgeHTML(item.source_type); // <--- Generate Badge
+                const badge = getSourceBadgeHTML(item.source_type);
                 sourcesHTML = `${badge}<a href="${item.source_url}" target="_blank">${hostname}</a>`;
             } catch {
                 sourcesHTML = `<span class="source-badge badge-unknown">Unknown</span> Source`;
@@ -121,9 +126,7 @@ function renderResults(data, container) {
         html += `
             <div class="claim-item ${statusClass}">
                 <div class="claim-header-row">
-                    <span class="claim-status-pill">${icon} ${
-            item.status
-        }</span>
+                    <span class="claim-status-pill">${icon} ${item.status}</span>
                 </div>
 
                 <div class="claim-text">"${item.claim}"</div>
@@ -138,9 +141,7 @@ function renderResults(data, container) {
                     </div>
                 </div>
                 
-                ${
-                    item.evidence
-                        ? `
+                ${item.evidence ? `
                 <div class="claim-actions" style="margin-top: 8px;">
                     <button class="toggle-evidence-btn">
                         See Evidence & Reasoning ▼
@@ -148,20 +149,38 @@ function renderResults(data, container) {
                     <div class="claim-evidence-hidden">
                         ${item.evidence}
                     </div>
-                </div>`
-                        : ""
-                }
+                </div>` : ""}
                 
-                ${
-                    sourcesHTML
-                        ? `<div class="claim-sources">${sourcesHTML}</div>`
-                        : ""
-                }
+                ${sourcesHTML ? `<div class="claim-sources">${sourcesHTML}</div>` : ""}
             </div>`;
     });
 
     html += `</div>`;
     container.innerHTML = html;
+
+    // Copy to clipboard functionality
+    const copyBtn = container.querySelector("#verifier-copy-btn");
+    if (copyBtn) {
+        copyBtn.addEventListener("click", () => {
+            const summary = data.claims.map(c => 
+                `[${c.status}] ${c.claim}\nConfidence: ${c.confidence_score}%\nSource: ${c.source_url || 'N/A'}`
+            ).join("\n\n");
+            
+            const fullText = `Fact Check Results:\n\n${summary}`;
+            
+            navigator.clipboard.writeText(fullText).then(() => {
+                // Success State
+                copyBtn.classList.add("copied");
+                copyBtn.innerHTML = `<span class="icon">✅</span> Copied!`;
+                
+                // Reset after 2 seconds
+                setTimeout(() => {
+                    copyBtn.classList.remove("copied");
+                    copyBtn.innerHTML = `Copy Results`;
+                }, 2000);
+            });
+        });
+    }
 
     // Show evidence toggles
     const buttons = container.querySelectorAll(".toggle-evidence-btn");
