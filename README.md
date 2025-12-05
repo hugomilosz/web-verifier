@@ -18,7 +18,7 @@ A browser extension that cross-references web content with trusted sources using
 Before you begin, ensure you have the following:
 - **Python 3.9+**
 - **Google Chrome**
-- A **Gemini API Key** (Get one [here](https://aistudio.google.com/app/apikey))
+- A [**Gemini API Key**](https://aistudio.google.com/app/apikey)
 
 This project has two parts that must be running: the backend server and the frontend extension.
 
