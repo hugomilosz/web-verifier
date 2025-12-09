@@ -4,14 +4,14 @@ A browser extension that cross-references web content with trusted sources using
 
 ## Features
 
-* **AI Overview Verification:** Automatically adds a "Verify" button to AI Overview sections on search pages.
-* **Tooltip Verification:** Highlight any text on a webpage to pop up a "Verify this" button.
-* **Context Menu Verification:** Right-click on any selected text and choose "Verify selection" from the menu.
+* **AI Overview Verification:** Automatically adds a `Verify` button to AI Overview sections on search pages.
+* **Tooltip Verification:** Highlight any text on a webpage to pop up a `Verify this` button.
+* **Context Menu Verification:** Right-click on any selected text and choose `Verify selection` from the menu.
 * **Verification Results:**
-    - **Clear Results:** Displays "Supported," "Contradicted," or "Unsure" claims in a simple results box with sources.
+    - **Clear Results:** Displays **Supported**, **Contradicted**, or **Unsure** claims in a simple results box with sources.
     - **Confidence Meter:** Visual bar (0-100%) indicating how certain the AI is based on the strength of evidence found.
     - **Source Credibility Badges:** Labels sources by domain type (`[GOV]`, `[ACADEMIC]`, `[NEWS]`, or `[OPINION]`).
-    - **Transparent Reasoning:** Expandable "See Reasoning" section explaining *why* a verdict was reached.
+    - **Transparent Reasoning:** Expandable `See Reasoning` section explaining why a verdict was reached.
 
 ## Setup
 
@@ -44,3 +44,8 @@ The extension is now active and will work as long as the backend server is runni
 
 * **For AI Overviews:** Click the `🕵️ Verify with Trusted Sources` button that appears in the AI Overview box.
 * **For Any Text:** Highlight the text you want to check. Either click the tooltip that appears or right-click and select `Verify selection`.
+
+## License  
+
+This project is licensed under the MIT License.
+See the `LICENSE` file for details.
